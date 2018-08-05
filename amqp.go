@@ -7,7 +7,7 @@ import (
 
 func init() {
 	// register driver
-	mq.OpenDriver("leveldb", func(config config.Config) (mq.Consumer, error) {
+	mq.OpenDriver("amqp", func(config config.Config) (mq.Consumer, error) {
 
 		return newConsumer(config)
 
