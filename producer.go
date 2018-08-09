@@ -3,12 +3,15 @@ package amqp
 import (
 	"encoding/json"
 
+	"github.com/dynamicgo/slf4go"
+
 	config "github.com/dynamicgo/go-config"
 	"github.com/dynamicgo/mq"
 	"github.com/streadway/amqp"
 )
 
 type producerImpl struct {
+	slf4go.Logger
 	conn       *amqp.Connection
 	channel    *amqp.Channel
 	topic      string
@@ -18,6 +21,7 @@ type producerImpl struct {
 func newProducer(config config.Config) (mq.Producer, error) {
 	producer := &producerImpl{
 		routingkey: config.Get("routingkey").String(""),
+		Logger:     slf4go.Get("amqp"),
 	}
 
 	url := config.Get("url").String("amqp://test:test@localhost:5672/")
@@ -52,6 +56,18 @@ func newProducer(config config.Config) (mq.Producer, error) {
 		return nil, err
 	}
 
+	c := make(chan amqp.Return, 10)
+
+	channel.NotifyReturn(c)
+
+	producer.DebugF("start trace")
+
+	go func() {
+		for r := range c {
+			producer.ErrorF("deliver message %s err %s", r.MessageId, r.ReplyText)
+		}
+	}()
+
 	return producer, nil
 }
 
@@ -72,7 +88,7 @@ func (producer *producerImpl) Send(record mq.Record) error {
 	return producer.channel.Publish(
 		producer.topic,
 		"",
-		false,
+		true,
 		false,
 		amqp.Publishing{
 			ContentType:     "application/json",
